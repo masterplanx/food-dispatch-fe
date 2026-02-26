@@ -1,0 +1,3792 @@
+openapi: 3.1.0
+info:
+  title: Food Dispatch Backend API
+  version: 1.0.0
+  description: |
+    Role-aware REST API for managing tenants, catalog entities, orders, and fulfillment
+    flows for the Food Dispatch platform. All business-facing identifiers exposed to
+    clients are sequential `ModelID` values (unsigned integers). Database `ID` values are
+    never accepted from or returned to API consumers.
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+security:
+  - BearerAuth: []
+tags:
+  - name: Health
+  - name: Authentication
+  - name: Tenants
+  - name: Users
+  - name: Sessions
+  - name: Customers
+  - name: Orders
+  - name: Catalog
+  - name: Junctions
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+      additionalProperties: true
+    Message:
+      type: object
+      properties:
+        message:
+          type: string
+      additionalProperties: false
+    Tenant:
+      type: object
+      properties:
+        ID:
+          type: integer
+        model_id:
+          type: integer
+        Name:
+          type: string
+        CreatedAt:
+          type: string
+          format: date-time
+        UpdatedAt:
+          type: string
+          format: date-time
+      required: [model_id, Name]
+    TenantRequest:
+      type: object
+      properties:
+        name:
+          type: string
+      required: [name]
+    User:
+      type: object
+      properties:
+        ID:
+          type: integer
+        model_id:
+          type: integer
+        Email:
+          type: string
+        Name:
+          type: string
+        Role:
+          type: string
+          enum: [admin, tenant_owner, tenant_user]
+        TenantID:
+          type: integer
+        Tenant:
+          $ref: '#/components/schemas/Tenant'
+        IsTenantOwner:
+          type: boolean
+      required: [model_id, Email, Role]
+    UserRequest:
+      type: object
+      properties:
+        email:
+          type: string
+        name:
+          type: string
+        password:
+          type: string
+          description: Plain text password for new users.
+        password_hash:
+          type: string
+          description: Pre-hashed password for administrative updates.
+        tenant_model_id:
+          type: integer
+        role:
+          type: string
+          enum: [admin, tenant_owner, tenant_user]
+        is_tenant_owner:
+          type: boolean
+      required: [email, name]
+    UserSession:
+      type: object
+      properties:
+        ID:
+          type: integer
+        model_id:
+          type: integer
+        UserID:
+          type: integer
+        TenantID:
+          type: integer
+        Token:
+          type: string
+        ExpiresAt:
+          type: string
+          format: date-time
+      required: [model_id, Token, ExpiresAt]
+    UserSessionRequest:
+      type: object
+      properties:
+        token:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+      required: [token, expires_at]
+    Customer:
+      type: object
+      properties:
+        ID:
+          type: integer
+        model_id:
+          type: integer
+        UUID:
+          type: integer
+        Name:
+          type: string
+        Email:
+          type: string
+        Phone:
+          type: string
+        Address:
+          type: string
+        Comments:
+          type: string
+        TenantID:
+          type: integer
+        ValidFrom:
+          type: string
+          format: date-time
+        ValidTo:
+          type: string
+          format: date-time
+          nullable: true
+      required: [model_id, UUID, Name]
+    CustomerRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        address:
+          type: string
+        comments:
+          type: string
+      required: [name]
+    Order:
+      type: object
+      properties:
+        ID:
+          type: integer
+        model_id:
+          type: integer
+        CustomerID:
+          type: integer
+        Comments:
+          type: string
+        Paid:
+          type: boolean
+        LastStatus:
+          type: string
+        OrderItems:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+      required: [model_id, CustomerID]
+    OrderRequest:
+      type: object
+      properties:
+        customer_model_id:
+          type: integer
+        comments:
+          type: string
+        paid:
+          type: boolean
+      required: [customer_model_id]
+    OrderItem:
+      type: object
+      properties:
+        ID:
+          type: integer
+        model_id:
+          type: integer
+        OrderID:
+          type: integer
+        ProductID:
+          type: integer
+        SizeID:
+          type: integer
+        Quantity:
+          type: integer
+        UnitPrice:
+          type: number
+          format: double
+        TotalPrice:
+          type: number
+          format: double
+      required: [model_id, OrderID]
+    OrderItemRequest:
+      type: object
+      properties:
+        product_model_id:
+          type: integer
+        size_model_id:
+          type: integer
+        quantity:
+          type: integer
+        unit_price:
+          type: number
+          format: double
+      required: [product_model_id, size_model_id, quantity, unit_price]
+    OrderItemExtra:
+      type: object
+      properties:
+        ID:
+          type: integer
+        model_id:
+          type: integer
+        OrderItemID:
+          type: integer
+        ExtraID:
+          type: integer
+        SizeID:
+          type: integer
+        ExtraPrice:
+          type: number
+          format: double
+      required: [model_id, OrderItemID]
+    OrderItemExtraRequest:
+      type: object
+      properties:
+        order_item_model_id:
+          type: integer
+          nullable: true
+        extra_model_id:
+          type: integer
+        size_model_id:
+          type: integer
+        unit_price:
+          type: number
+          format: double
+      required: [extra_model_id, size_model_id, unit_price]
+    OrderStatus:
+      type: object
+      properties:
+        ID:
+          type: integer
+        model_id:
+          type: integer
+        Status:
+          type: string
+        OrderID:
+          type: integer
+      required: [model_id, Status]
+    ProductCategory:
+      type: object
+      properties:
+        ID:
+          type: integer
+        model_id:
+          type: integer
+        UUID:
+          type: integer
+        Category:
+          type: string
+        Description:
+          type: string
+      required: [model_id, UUID, Category]
+    ProductCategoryRequest:
+      type: object
+      properties:
+        category:
+          type: string
+        description:
+          type: string
+      required: [category]
+    Product:
+      type: object
+      properties:
+        ID:
+          type: integer
+        model_id:
+          type: integer
+        UUID:
+          type: integer
+        Name:
+          type: string
+        Description:
+          type: string
+        ProductCategoryID:
+          type: integer
+      required: [model_id, UUID, Name]
+    ProductRequest:
+      type: object
+      properties:
+        product_category_id:
+          type: integer
+          description: ModelID of the parent product category.
+        name:
+          type: string
+        description:
+          type: string
+      required: [product_category_id, name]
+    Size:
+      type: object
+      properties:
+        ID:
+          type: integer
+        model_id:
+          type: integer
+        UUID:
+          type: integer
+        Name:
+          type: string
+        Description:
+          type: string
+      required: [model_id, UUID, Name]
+    SizeRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+      required: [name]
+    Price:
+      type: object
+      properties:
+        ID:
+          type: integer
+        model_id:
+          type: integer
+        UUID:
+          type: integer
+        SizeID:
+          type: integer
+          nullable: true
+        ProductID:
+          type: integer
+          nullable: true
+        ExtraID:
+          type: integer
+          nullable: true
+        Price:
+          type: number
+          format: double
+      required: [model_id, UUID, Price]
+    PriceRequest:
+      type: object
+      properties:
+        size_model_id:
+          type: integer
+          nullable: true
+        product_model_id:
+          type: integer
+          nullable: true
+        extra_model_id:
+          type: integer
+          nullable: true
+        price:
+          type: number
+          format: double
+      required: [price]
+    ExtraType:
+      type: object
+      properties:
+        ID:
+          type: integer
+        model_id:
+          type: integer
+        UUID:
+          type: integer
+        Type:
+          type: string
+        Description:
+          type: string
+      required: [model_id, UUID, Type]
+    ExtraTypeRequest:
+      type: object
+      properties:
+        type:
+          type: string
+        description:
+          type: string
+      required: [type]
+    Extra:
+      type: object
+      properties:
+        ID:
+          type: integer
+        model_id:
+          type: integer
+        UUID:
+          type: integer
+        Name:
+          type: string
+        Description:
+          type: string
+        ExtraTypeID:
+          type: integer
+      required: [model_id, UUID, Name]
+    ExtraRequest:
+      type: object
+      properties:
+        extra_type_model_id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+      required: [extra_type_model_id, name]
+    SizeProductRequest:
+      type: object
+      properties:
+        size_model_id:
+          type: integer
+        product_model_id:
+          type: integer
+      required: [size_model_id, product_model_id]
+    SizeExtraRequest:
+      type: object
+      properties:
+        size_model_id:
+          type: integer
+        extra_model_id:
+          type: integer
+      required: [size_model_id, extra_model_id]
+    ProductExtraRequest:
+      type: object
+      properties:
+        product_model_id:
+          type: integer
+        extra_model_id:
+          type: integer
+      required: [product_model_id, extra_model_id]
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+        user:
+          $ref: '#/components/schemas/User'
+      required: [token, expires_at, user]
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+      required: [email, password]
+    RegisterRequest:
+      type: object
+      properties:
+        tenant:
+          type: object
+          properties:
+            name:
+              type: string
+          required: [name]
+        user:
+          type: object
+          properties:
+            email:
+              type: string
+              format: email
+            name:
+              type: string
+            password:
+              type: string
+          required: [email, name, password]
+      required: [tenant, user]
+    RegisterTenantUserRequest:
+      type: object
+      properties:
+        email:
+          type: string
+        name:
+          type: string
+        password:
+          type: string
+      required: [email, name, password]
+  responses:
+    Unauthorized:
+      description: Authentication required or invalid token.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Authenticated user lacks the required role.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Resource not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    BadRequest:
+      description: Malformed request.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Conflict:
+      description: Resource conflict.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ServerError:
+      description: Internal server error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+paths:
+  /api/health:
+    get:
+      tags: [Health]
+      summary: Health check
+      description: Returns API and database health information.
+      security: []
+      responses:
+        '200':
+          description: Service is healthy.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  message:
+                    type: string
+        '503':
+          description: Service is unhealthy.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/stats:
+    get:
+      tags: [Health]
+      summary: Database statistics
+      description: Returns database pool statistics. Admin only.
+      security:
+        - BearerAuth: []
+      x-roles: [admin]
+      responses:
+        '200':
+          description: Database stats snapshot.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  oneOf:
+                    - type: integer
+                    - type: number
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/auth/register:
+    post:
+      tags: [Authentication]
+      summary: Register tenant owner
+      description: Creates a tenant together with its owner user.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Tenant owner created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /api/auth/login:
+    post:
+      tags: [Authentication]
+      summary: Login
+      description: Authenticates a user and returns a JWT.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/auth/register-tenant-user:
+    post:
+      tags: [Authentication]
+      summary: Invite tenant member
+      description: Creates a secondary user within the caller's tenant. Tenant-owner tokens only.
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterTenantUserRequest'
+      responses:
+        '201':
+          description: Tenant user created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/auth/logout:
+    post:
+      tags: [Authentication]
+      summary: Logout
+      description: Invalidates the current session token.
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '204':
+          description: Logout successful.
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /api/tenants:
+    get:
+      tags: [Tenants]
+      summary: List tenants
+      description: Lists all tenants. Admin only.
+      security:
+        - BearerAuth: []
+      x-roles: [admin]
+      responses:
+        '200':
+          description: Tenant list.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Tenant'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Tenants]
+      summary: Create tenant
+      description: Creates a tenant (does not create a user). Admin only.
+      security:
+        - BearerAuth: []
+      x-roles: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TenantRequest'
+      responses:
+        '201':
+          description: Tenant created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tenant'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /api/tenants/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: Tenant ModelID.
+    get:
+      tags: [Tenants]
+      summary: Get tenant
+      security:
+        - BearerAuth: []
+      x-roles: [admin]
+      responses:
+        '200':
+          description: Tenant retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tenant'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Tenants]
+      summary: Update tenant
+      security:
+        - BearerAuth: []
+      x-roles: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TenantRequest'
+      responses:
+        '200':
+          description: Tenant updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tenant'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Tenants]
+      summary: Delete tenant
+      security:
+        - BearerAuth: []
+      x-roles: [admin]
+      responses:
+        '204':
+          description: Tenant deleted.
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/tenants/name/{name}:
+    parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Tenants]
+      summary: Get tenant by name
+      security:
+        - BearerAuth: []
+      x-roles: [admin]
+      responses:
+        '200':
+          description: Tenant found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tenant'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/users:
+    get:
+      tags: [Users]
+      summary: List users
+      description: Lists all users. Admin only.
+      security:
+        - BearerAuth: []
+      x-roles: [admin]
+      responses:
+        '200':
+          description: User list.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Users]
+      summary: Create user
+      description: Creates a user under a tenant. Admin only.
+      security:
+        - BearerAuth: []
+      x-roles: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRequest'
+      responses:
+        '201':
+          description: User created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/users/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: User ModelID.
+    get:
+      tags: [Users]
+      summary: Get user by ModelID
+      security:
+        - BearerAuth: []
+      x-roles: [admin]
+      responses:
+        '200':
+          description: User retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Users]
+      summary: Update user
+      security:
+        - BearerAuth: []
+      x-roles: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRequest'
+      responses:
+        '200':
+          description: User updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Users]
+      summary: Delete user
+      security:
+        - BearerAuth: []
+      x-roles: [admin]
+      responses:
+        '204':
+          description: User deleted.
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/users/email/{email}:
+    parameters:
+      - name: email
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Users]
+      summary: Get user by email
+      security:
+        - BearerAuth: []
+      x-roles: [admin]
+      responses:
+        '200':
+          description: User found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/tenants/{tenantId}/users:
+    parameters:
+      - name: tenantId
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: Tenant ModelID.
+    get:
+      tags: [Users]
+      summary: List users for tenant
+      security:
+        - BearerAuth: []
+      x-roles: [admin]
+      responses:
+        '200':
+          description: Tenant users list.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/sessions:
+    get:
+      tags: [Sessions]
+      summary: List sessions
+      description: Lists all active sessions. Admin only.
+      security:
+        - BearerAuth: []
+      x-roles: [admin]
+      responses:
+        '200':
+          description: Session list.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserSession'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/sessions/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: Session ModelID.
+    get:
+      tags: [Sessions]
+      summary: Get session
+      security:
+        - BearerAuth: []
+      x-roles: [admin]
+      responses:
+        '200':
+          description: Session found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSession'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Sessions]
+      summary: Update session
+      security:
+        - BearerAuth: []
+      x-roles: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserSessionRequest'
+      responses:
+        '200':
+          description: Session updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSession'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Sessions]
+      summary: Delete session
+      security:
+        - BearerAuth: []
+      x-roles: [admin]
+      responses:
+        '204':
+          description: Session deleted.
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/sessions/token/{token}:
+    parameters:
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Sessions]
+      summary: Get session by token
+      security:
+        - BearerAuth: []
+      x-roles: [admin]
+      responses:
+        '200':
+          description: Session found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSession'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/sessions/expired:
+    delete:
+      tags: [Sessions]
+      summary: Delete expired sessions
+      security:
+        - BearerAuth: []
+      x-roles: [admin]
+      responses:
+        '204':
+          description: Expired sessions removed.
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/users/{userId}/sessions:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: User ModelID.
+    post:
+      tags: [Sessions]
+      summary: Create session for user
+      security:
+        - BearerAuth: []
+      x-roles: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserSessionRequest'
+      responses:
+        '201':
+          description: Session created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSession'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    get:
+      tags: [Sessions]
+      summary: List sessions for user
+      security:
+        - BearerAuth: []
+      x-roles: [admin]
+      responses:
+        '200':
+          description: Session list for the user.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserSession'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/customers:
+    get:
+      tags: [Customers]
+      summary: List customers
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Active customers.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Customer'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Customers]
+      summary: Create customer
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomerRequest'
+      responses:
+        '201':
+          description: Customer created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /api/customers/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: Customer ModelID.
+    get:
+      tags: [Customers]
+      summary: Get customer
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Customer found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Customers]
+      summary: Update customer (creates new version)
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomerRequest'
+      responses:
+        '200':
+          description: Customer updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Customers]
+      summary: Delete customer
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '204':
+          description: Customer deleted.
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/customers/email/{email}:
+    parameters:
+      - name: email
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Customers]
+      summary: Get customer by email
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Customer found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/customers/phone/{phone}:
+    parameters:
+      - name: phone
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Customers]
+      summary: Get customer by phone
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Customer found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/customers/search/name/{name}:
+    parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Customers]
+      summary: Search customers by name fragment
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Matching customers.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Customer'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/customers/search/email/{email}:
+    parameters:
+      - name: email
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Customers]
+      summary: Search customers by email fragment
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Matching customers.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Customer'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/customers/uuid/{uuid}:
+    parameters:
+      - name: uuid
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Customers]
+      summary: Get customer by UUID
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Customer found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/customers/versions:
+    get:
+      tags: [Customers]
+      summary: List customer versions
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: All customer versions (including inactive).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Customer'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/customers/{uuid}/history:
+    parameters:
+      - name: uuid
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: Logical customer UUID.
+    get:
+      tags: [Customers]
+      summary: Customer history
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: History ordered by version.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Customer'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/customers/{customerId}/orders:
+    parameters:
+      - name: customerId
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: Customer ModelID.
+    get:
+      tags: [Orders]
+      summary: List orders for a customer
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Orders for the given customer.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/order-statuses:
+    get:
+      tags: [Orders]
+      summary: List order statuses
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Status list.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrderStatus'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Orders]
+      summary: Create order status
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                order_model_id:
+                  type: integer
+              required: [status, order_model_id]
+      responses:
+        '201':
+          description: Status created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderStatus'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/order-statuses/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: Order status ModelID.
+    get:
+      tags: [Orders]
+      summary: Get order status
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Status retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderStatus'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Orders]
+      summary: Update order status
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+              required: [status]
+      responses:
+        '200':
+          description: Status updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderStatus'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Orders]
+      summary: Delete order status
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '204':
+          description: Status deleted.
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/order-statuses/status/{status}:
+    parameters:
+      - name: status
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Orders]
+      summary: Get status by name
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Status retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderStatus'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/order-statuses/{status}/orders:
+    parameters:
+      - name: status
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Status name.
+    get:
+      tags: [Orders]
+      summary: List orders by status name
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Orders filtered by status.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/orders:
+    get:
+      tags: [Orders]
+      summary: List orders
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Orders for the tenant.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Orders]
+      summary: Create order
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderRequest'
+      responses:
+        '201':
+          description: Order created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/orders/paid:
+    get:
+      tags: [Orders]
+      summary: List paid orders
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Paid orders.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/orders/unpaid:
+    get:
+      tags: [Orders]
+      summary: List unpaid orders
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Unpaid orders.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/orders/search/comments/{comments}:
+    parameters:
+      - name: comments
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Orders]
+      summary: Search orders by comments fragment
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Matching orders.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/orders/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: Order ModelID.
+    get:
+      tags: [Orders]
+      summary: Get order by ModelID
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Order retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Orders]
+      summary: Update order
+      description: Updates customer ModelID, comments, or paid flag.
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderRequest'
+      responses:
+        '200':
+          description: Order updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Orders]
+      summary: Delete order
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '204':
+          description: Order deleted.
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/orders/{orderId}/current-status:
+    parameters:
+      - name: orderId
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Orders]
+      summary: Current status for an order
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Current status.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderStatus'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/orders/{orderId}/statuses:
+    parameters:
+      - name: orderId
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Orders]
+      summary: Status history for an order
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: List of status transitions.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrderStatus'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/orders/{orderId}/items:
+    parameters:
+      - name: orderId
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Orders]
+      summary: List order items for an order
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Order items.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrderItem'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Orders]
+      summary: Create order item
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderItemRequest'
+      responses:
+        '201':
+          description: Order item created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderItem'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/order-items/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: Order item ModelID.
+    get:
+      tags: [Orders]
+      summary: Get order item
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Order item data.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderItem'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Orders]
+      summary: Update order item
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderItemRequest'
+      responses:
+        '200':
+          description: Order item updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderItem'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Orders]
+      summary: Delete order item
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '204':
+          description: Order item deleted.
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/products/{productId}/order-items:
+    parameters:
+      - name: productId
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Orders]
+      summary: List order items by product
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Items referencing the product.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrderItem'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/sizes/{sizeId}/order-items:
+    parameters:
+      - name: sizeId
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Orders]
+      summary: List order items by size
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Items referencing the size.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrderItem'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/order-items/{orderItemId}/extras:
+    parameters:
+      - name: orderItemId
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Orders]
+      summary: List extras for an order item
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Item extras.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrderItemExtra'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Orders]
+      summary: Create order item extra
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderItemExtraRequest'
+      responses:
+        '201':
+          description: Extra created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderItemExtra'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/order-item-extras/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Orders]
+      summary: Get order item extra
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Extra retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderItemExtra'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Orders]
+      summary: Update order item extra
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderItemExtraRequest'
+      responses:
+        '200':
+          description: Extra updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderItemExtra'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Orders]
+      summary: Delete order item extra
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '204':
+          description: Extra deleted.
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/extras/{extraId}/order-item-extras:
+    parameters:
+      - name: extraId
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Orders]
+      summary: List order item extras referencing an extra
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Order item extras for the extra.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrderItemExtra'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/sizes/{sizeId}/order-item-extras:
+    parameters:
+      - name: sizeId
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Orders]
+      summary: List order item extras referencing a size
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Order item extras for the size.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrderItemExtra'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/product-categories:
+    get:
+      tags: [Catalog]
+      summary: List product categories
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Category list.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProductCategory'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Catalog]
+      summary: Create product category
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductCategoryRequest'
+      responses:
+        '201':
+          description: Category created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductCategory'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/product-categories/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: Category ModelID.
+    get:
+      tags: [Catalog]
+      summary: Get product category
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Category retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductCategory'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Catalog]
+      summary: Update product category (new version)
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductCategoryRequest'
+      responses:
+        '200':
+          description: Category updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductCategory'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Catalog]
+      summary: Delete product category
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '204':
+          description: Category deleted.
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/product-categories/category/{category}:
+    parameters:
+      - name: category
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Catalog]
+      summary: Get category by name
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Category retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductCategory'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/product-categories/versions:
+    get:
+      tags: [Catalog]
+      summary: List category versions
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: All versions.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProductCategory'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/product-categories/{uuid}/history:
+    parameters:
+      - name: uuid
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Catalog]
+      summary: Category history
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Version history.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProductCategory'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/products:
+    get:
+      tags: [Catalog]
+      summary: List products
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Product list.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Catalog]
+      summary: Create product
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductRequest'
+      responses:
+        '201':
+          description: Product created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/products/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Catalog]
+      summary: Get product
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Product retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Catalog]
+      summary: Update product (new version)
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductRequest'
+      responses:
+        '200':
+          description: Product updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Catalog]
+      summary: Delete product
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '204':
+          description: Product deleted.
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/products/name/{name}:
+    parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Catalog]
+      summary: Get product by name
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Product retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/products/search/name/{name}:
+    parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Catalog]
+      summary: Search products by name fragment
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Matching products.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/products/uuid/{uuid}:
+    parameters:
+      - name: uuid
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Catalog]
+      summary: Get product by UUID
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Product retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/products/{uuid}/history:
+    parameters:
+      - name: uuid
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Catalog]
+      summary: Product history
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Version history.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/product-categories/{categoryId}/products:
+    parameters:
+      - name: categoryId
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: Product category ModelID.
+    get:
+      tags: [Catalog]
+      summary: List products within a category
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Product list for the category.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/sizes:
+    get:
+      tags: [Catalog]
+      summary: List sizes
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Size list.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Size'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Catalog]
+      summary: Create size
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SizeRequest'
+      responses:
+        '201':
+          description: Size created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Size'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/sizes/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Catalog]
+      summary: Get size
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Size retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Size'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Catalog]
+      summary: Update size (new version)
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SizeRequest'
+      responses:
+        '200':
+          description: Size updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Size'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Catalog]
+      summary: Delete size
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '204':
+          description: Size deleted.
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/sizes/name/{name}:
+    parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Catalog]
+      summary: Get size by name
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Size retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Size'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/sizes/uuid/{uuid}:
+    parameters:
+      - name: uuid
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Catalog]
+      summary: Get size by UUID
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Size retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Size'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/sizes/{uuid}/history:
+    parameters:
+      - name: uuid
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Catalog]
+      summary: Size history
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Version history.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Size'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/sizes/versions:
+    get:
+      tags: [Catalog]
+      summary: List size versions
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: All versions.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Size'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/prices:
+    get:
+      tags: [Catalog]
+      summary: List prices
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Price list.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Price'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Catalog]
+      summary: Create price
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PriceRequest'
+      responses:
+        '201':
+          description: Price created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Price'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/prices/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Catalog]
+      summary: Get price
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Price retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Price'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Catalog]
+      summary: Update price (new version)
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PriceRequest'
+      responses:
+        '200':
+          description: Price updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Price'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Catalog]
+      summary: Delete price
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '204':
+          description: Price deleted.
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/prices/uuid/{uuid}:
+    parameters:
+      - name: uuid
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Catalog]
+      summary: Get price by UUID
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Price retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Price'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/prices/size/{sizeId}/product/{productId}:
+    parameters:
+      - name: sizeId
+        in: path
+        required: true
+        schema:
+          type: integer
+      - name: productId
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Catalog]
+      summary: Get price by size and product ModelID
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Matching price.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Price'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/products/{productId}/price:
+    parameters:
+      - name: productId
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Catalog]
+      summary: Get the active base price for a product
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Price retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Price'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/products/{productId}/prices:
+    parameters:
+      - name: productId
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Catalog]
+      summary: List prices for a product
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Price list for the product.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Price'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/products/{productId}/product-prices:
+    parameters:
+      - name: productId
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Catalog]
+      summary: List product+size price matrix
+      description: Convenience endpoint returning every price row referencing the product, grouped by size/extra.
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Price matrix.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Price'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/sizes/{sizeId}/prices:
+    parameters:
+      - name: sizeId
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Catalog]
+      summary: List prices for a size
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Price list for the size.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Price'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/extras/{extraId}/prices:
+    parameters:
+      - name: extraId
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Catalog]
+      summary: List prices for an extra
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Price list for the extra.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Price'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/extra-types:
+    get:
+      tags: [Catalog]
+      summary: List extra types
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Extra type list.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ExtraType'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Catalog]
+      summary: Create extra type
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExtraTypeRequest'
+      responses:
+        '201':
+          description: Extra type created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExtraType'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/extra-types/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Catalog]
+      summary: Get extra type
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Extra type retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExtraType'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Catalog]
+      summary: Update extra type (new version)
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExtraTypeRequest'
+      responses:
+        '200':
+          description: Extra type updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExtraType'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Catalog]
+      summary: Delete extra type
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '204':
+          description: Extra type deleted.
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/extra-types/type/{type}:
+    parameters:
+      - name: type
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Catalog]
+      summary: Get extra type by name
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Extra type retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExtraType'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/extra-types/uuid/{uuid}:
+    parameters:
+      - name: uuid
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Catalog]
+      summary: Get extra type by UUID
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Extra type retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExtraType'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/extra-types/{uuid}/history:
+    parameters:
+      - name: uuid
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Catalog]
+      summary: Extra type history
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Version history.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ExtraType'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/extra-types/versions:
+    get:
+      tags: [Catalog]
+      summary: List extra type versions
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: All versions for the tenant.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ExtraType'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/extras:
+    get:
+      tags: [Catalog]
+      summary: List extras
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Extra list.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Extra'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Catalog]
+      summary: Create extra
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExtraRequest'
+      responses:
+        '201':
+          description: Extra created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Extra'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/extras/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Catalog]
+      summary: Get extra
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Extra retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Extra'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Catalog]
+      summary: Update extra (new version)
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExtraRequest'
+      responses:
+        '200':
+          description: Extra updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Extra'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Catalog]
+      summary: Delete extra
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '204':
+          description: Extra deleted.
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/extras/name/{name}:
+    parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Catalog]
+      summary: Get extra by name
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Extra retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Extra'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/extras/search/name/{name}:
+    parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Catalog]
+      summary: Search extras by name fragment
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Matching extras.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Extra'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/extra-types/{typeId}/extras:
+    parameters:
+      - name: typeId
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Catalog]
+      summary: List extras by extra type ModelID
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Extra list for the type.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Extra'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/extras/uuid/{uuid}:
+    parameters:
+      - name: uuid
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Catalog]
+      summary: Get extra by UUID
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Extra retrieved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Extra'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/extras/{id}/prices:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Catalog]
+      summary: Prices referencing an extra
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Price list.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Price'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/size-products:
+    get:
+      tags: [Junctions]
+      summary: List size-product links
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Associations between sizes and products.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    ID:
+                      type: integer
+                    model_id:
+                      type: integer
+                    SizeID:
+                      type: integer
+                    ProductID:
+                      type: integer
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Junctions]
+      summary: Link size to product
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SizeProductRequest'
+      responses:
+        '201':
+          description: Association created.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  model_id:
+                    type: integer
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/size-products/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Junctions]
+      summary: Get size-product link
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Association retrieved.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  model_id:
+                    type: integer
+                  SizeID:
+                    type: integer
+                  ProductID:
+                    type: integer
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Junctions]
+      summary: Update size-product link
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SizeProductRequest'
+      responses:
+        '200':
+          description: Association updated.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  model_id:
+                    type: integer
+                  SizeID:
+                    type: integer
+                  ProductID:
+                    type: integer
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Junctions]
+      summary: Delete size-product link
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '204':
+          description: Association deleted.
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/products/{productId}/size-products:
+    parameters:
+      - name: productId
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Junctions]
+      summary: List sizes available for a product
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Associations.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    model_id:
+                      type: integer
+                    SizeID:
+                      type: integer
+                    ProductID:
+                      type: integer
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/sizes/{sizeId}/size-products:
+    parameters:
+      - name: sizeId
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Junctions]
+      summary: List products compatible with a size
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Associations.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/size-extras:
+    get:
+      tags: [Junctions]
+      summary: List size-extra links
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Associations.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    model_id:
+                      type: integer
+                    SizeID:
+                      type: integer
+                    ExtraID:
+                      type: integer
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Junctions]
+      summary: Link size to extra
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SizeExtraRequest'
+      responses:
+        '201':
+          description: Association created.
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/size-extras/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Junctions]
+      summary: Get size-extra link
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Association retrieved.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  model_id:
+                    type: integer
+                  SizeID:
+                    type: integer
+                  ExtraID:
+                    type: integer
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Junctions]
+      summary: Update size-extra link
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SizeExtraRequest'
+      responses:
+        '200':
+          description: Association updated.
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Junctions]
+      summary: Delete size-extra link
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '204':
+          description: Association deleted.
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/sizes/{sizeId}/size-extras:
+    parameters:
+      - name: sizeId
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Junctions]
+      summary: List extras allowed for a size
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Associations.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/extras/{extraId}/size-extras:
+    parameters:
+      - name: extraId
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Junctions]
+      summary: List sizes compatible with an extra
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Associations.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/product-extras:
+    get:
+      tags: [Junctions]
+      summary: List product-extra links
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Associations.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    model_id:
+                      type: integer
+                    ProductID:
+                      type: integer
+                    ExtraID:
+                      type: integer
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Junctions]
+      summary: Link product to extra
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductExtraRequest'
+      responses:
+        '201':
+          description: Association created.
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/product-extras/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Junctions]
+      summary: Get product-extra link
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Association retrieved.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  model_id:
+                    type: integer
+                  ProductID:
+                    type: integer
+                  ExtraID:
+                    type: integer
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Junctions]
+      summary: Update product-extra link
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductExtraRequest'
+      responses:
+        '200':
+          description: Association updated.
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Junctions]
+      summary: Delete product-extra link
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '204':
+          description: Association deleted.
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/products/{productId}/product-extras:
+    parameters:
+      - name: productId
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Junctions]
+      summary: List extras for a product
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Associations.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/extras/{extraId}/product-extras:
+    parameters:
+      - name: extraId
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Junctions]
+      summary: List products that include an extra
+      security:
+        - BearerAuth: []
+      x-roles: [tenant_owner, tenant_user]
+      responses:
+        '200':
+          description: Associations.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }

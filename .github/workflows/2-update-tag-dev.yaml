@@ -1,0 +1,67 @@
+name: CI/CD - Update Image Tag and Deploy to ArgoCD
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+        description: "Environment that will be updated with new image tag"
+      service:
+        required: true
+        type: string
+        description: "Service that will be updated with new image tag"
+      tag:
+        required: true
+        type: string
+        description: "Image tag"
+      env-path-name:
+        required: true
+        type: string
+      repository-name:
+        required: true
+        type: string
+        description: "Environment that will be updated with new image tag"        
+    secrets:
+      private-key:
+        description: 'Private key for GitHub App to access repositories'
+        required: true
+
+jobs:
+  promote-to-env:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate Token for GitHub App
+        uses: actions/create-github-app-token@v2
+        id: app-token
+        with:
+          app-id: ${{ vars.GH_APP_ID }}
+          private-key:  ${{ secrets.private-key }}
+          owner: ${{ github.repository_owner }}
+
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          persist-credentials: false
+          repository: "${{ github.repository_owner }}/${{ env.repository_name }}"
+          ref: main
+        env:
+          repository_name: ${{ inputs.repository-name }}
+
+      - name: Install yq
+        id: setup-yq
+        uses: shiipou/setup-yq-action@v2.2.0
+
+      - name: Update Tags
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          tag-path: "image.tag"
+          values-path: "application/${{ inputs.env-path-name }}/${{ inputs.service }}"
+          repository_name: ${{ inputs.environment }}
+        run: |
+          git config --global url."https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/".insteadOf "https://github.com/"          
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"          
+          yq -i ".${{inputs.service}}.${{env.tag-path}} = \"${{inputs.tag}}\"" "${{ env.values-path }}/values.yaml"          
+          git add "${{ env.values-path }}/values.yaml"
+          git commit -m "AUTO: Bump ${{ inputs.service }} image tag to ${{ inputs.tag }} for env ${{ inputs.environment }}"          
+          git push
